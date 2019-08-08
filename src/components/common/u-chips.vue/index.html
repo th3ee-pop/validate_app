@@ -7,15 +7,17 @@
         <div :class="type==='searchInput' ? $style.inputWrapper : ''" ref="wrapper">
         <template v-for="(item, index) in list">
             <!-- 编辑的输入框 -->
+            <u-validator v-if="modifying && current === index" :rules="new_rules" ref="modifyValidator" validatingProcess="interval">
             <u-input v-if="modifying && current === index" :disabled="asyncChecking" type="text" v-model="modifyItem" ref="cpModifyInput" @keydown="onModifyKeydown" @blur="onModifyBlur"
                      :class="!!errMessage ? $style.inputError : ''" ></u-input>
+            </u-validator>
             <div :class="[$style.unit, current === index ? $style.unitFocus : '']" @click="onFocus(index, $event)"
                 @dblclick="onDBLClick(index, $event)" :title="item">{{item}}
                 <span :class="$style.close" @click="deleteItem(index)">&#215;</span>
             </div>
         </template>
         <!-- 添加新项的输入框 -->
-            <u-validator :rules="new_rules" ref="textValidator">
+            <u-validator :rules="new_rules" ref="textValidator" validatingProcess="interval">
                 <u-textarea :disabled="asyncChecking" :style="{ height: height + 'px', width: width + 'px' }" :class="[focus ? $style.textareaFocus : '', !!errMessage && !modifying ? $style.textareaError : '']"
                             ref="cpInput" type="text" @blur="onInputBlur" @focus="onInputFocus" @keydown="onKeydown"
                             @input="onAddInput" v-model="item">

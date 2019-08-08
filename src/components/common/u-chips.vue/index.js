@@ -269,6 +269,7 @@ export default {
          * @param {object} event - 包装事件对象
          */
         onInputBlur(event) {
+            console.log('bluring');
             if (this.asyncChecking)
                 return;
             this.generate(this.item);
@@ -306,11 +307,11 @@ export default {
                 if (this.$refs.cpInput.$refs.input === document.activeElement && item) {
                     this.generate(item);
                     // 通过空格||逗号正常生成项之后，会残留字符。重置
-                    if (!this.errMessage && !this.async) {
+                    /*if (!this.errMessage && !this.async) {
                         setTimeout(() => {
                             this.item = '';
                         });
-                    }
+                    }*/
                 }
             }
             // 左键 || backspace 切换focus项
@@ -322,11 +323,10 @@ export default {
             }
         },
         onAddInput() {
-            console.log(this.item);
             // 处理用户复制粘贴多个以空格符分割开的字符串
             if (!this.item.endsWith(' ') && this.item.includes(' ')) {
                 this.generate(this.item);
-                //this.$refs.cpInput.$refs.input.focus();
+                this.$refs.cpInput.$refs.input.focus();
             }
         },
         /**
@@ -408,6 +408,7 @@ export default {
          * @param {boolean} [isModify=false] - 是否是编辑已生成项
          */
         generate(item, isModify = false) {
+            console.log('generating');
             if (this.type === 'searchInput' && /^\s*$/.test(item))
                 return;
             // item == false，说明item为空字符串或空格组成的字符串
@@ -438,9 +439,56 @@ export default {
             if (this.async)
                 return this.asyncGenerate(item, isModify, itemArr);
 
-            itemArr.every((itm, index) => {
+            this.validateQueue(itemArr, this.$refs).then(res => {
+                this.list= this.list.concat(itemArr);
+                this.item = '';
+                this.$refs.cpInput.currentValue = this.item;
+            }).catch(e => {
+                this.list = this.list.concat(itemArr.splice(0, e));
+                const str = itemArr.join(' ');
+                isModify ? (this.modifyItem = str) : (this.item = str);
+                this.$refs.cpInput.currentValue = this.item;
+            });
+            /*let validatePromise = new Promise((resolve, reject) => {
+                itemArr.forEach((item, index) => {
+                    this.$refs.textValidator.value = item;
+                    this.$refs.textValidator.validate('input').then(res => {
+                        console.log(index,res);
+                        arrIndex = index + 1;
+                        if (index === itemArr.length - 1) {
+                            resolve(arrIndex);
+                        }
+                    }, e => {
+                        reject(index);
+                    })
+                });
+            });*/
+
+            //this.$refs.cpInput.currentValue = '';
+            /*const validateArr = itemArr.map((item) => {
+                return this.$refs.textValidator.validate('input').then(res => {
+                    console.log(res);
+                    this.list.push(item);
+                    itemArr.shift();
+                    this.$refs.textValidator.value = itemArr.join(' ');
+                })
+            });
+            this.promiseQueue(validateArr).catch(e => {
+                console.log(e);
+            });*/
+            /*itemArr.every((itm, index) => {
                 this.validate(itm, 'input+blur');
-                if (this.errMessage)
+                this.$refs.textValidator.validate('input + blur').then(res => {
+                    console.log(res);
+                    this.list.push(itm);
+                    this.$emit('input', this.list);
+                    arrIndex = index + 1;
+                    return true;
+                }).catch(e => {
+                    console.log(e);
+                    return false;
+                });*/
+                /*if (this.errMessage)
                     return false;
                 else {
                     // 编辑生成项
@@ -453,12 +501,8 @@ export default {
                     this.$emit('input', this.list);
                     arrIndex = index + 1;
                     return true;
-                }
-            });
-            itemArr.splice(0, arrIndex);
-            const str = itemArr.join(' ');
-            isModify ? (this.modifyItem = str) : (this.item = str);
-            //this.$refs.cpInput.currentValue = this.item;
+                }*/
+            //});
         },
         asyncGenerate(item, isModify, itemArr) {
             let promise = Promise.resolve();
@@ -561,5 +605,17 @@ export default {
                 this.morePosRight = this.$refs.wrapper.clientWidth - lastEle.offsetLeft - lastEle.offsetWidth + 52;
             });
         },
+        async validateQueue(itemArr, $refs) {
+            for (let i = 0 ;i < itemArr.length; i++) {
+                try {
+                    this.$refs.textValidator.value = itemArr[i];
+                    await $refs.textValidator.validate('blur').then(res => {
+                    })
+                } catch (e) {
+                    throw (i);
+                }
+            }
+            return 'success!';
+        }
     },
 };

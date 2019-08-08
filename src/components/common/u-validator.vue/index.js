@@ -23,6 +23,7 @@ export const UValidator = {
         ignoreValidation: { type: Boolean, default: false },
         validatingOptions: Object,
         validatingValue: null,
+        validatingProcess: String
     },
     data() {
         return {
@@ -160,7 +161,6 @@ export const UValidator = {
         onInput(value) {
             if (this.currentTarget === 'validatorVMs')
                 return;
-
             if (!this.fieldTouched)
                 this.fieldTouched = true;
             this.inputing = true;
@@ -179,7 +179,7 @@ export const UValidator = {
                 this.oldValue = $event.value;
             this.value = $event.value;
             // @compat: 以后推荐使用 @update & @input 事件
-            if (!this.hasUpdateEvent && !this.inputing)
+            if (!this.hasUpdateEvent && !this.inputing && this.validatingProcess !== 'interval')
                 this.validate('submit', true).catch((errors) => errors);
         },
         onFocus() {
@@ -196,9 +196,11 @@ export const UValidator = {
             if (!this.fieldTouched)
                 this.fieldTouched = true;
             this.color = this.state = '';
+            if (this.validatingProcess !== 'interval')
             this.$nextTick(() => this.validate('blur').catch((errors) => errors));
         },
         validate(trigger = 'submit', untouched = false) {
+            console.log(trigger, this.value);
             if (this.currentTarget === 'validatorVMs') {
                 return Promise.all(this.validatorVMs.map((validatorVM) => validatorVM.validate('submit', untouched)
                     .catch((errors) => errors))).then((results) => {
@@ -293,8 +295,14 @@ export const UValidator = {
                     const validator = new Validator({
                         [name]: rules,
                     });
-
+                    /**
+                     * 判断如果检验类型是间断式，则只验证第一个间断项
+                     */
+                    if (this.validatingProcess === 'interval' && this.value.split(/\s|,/).length > 1) {
+                        return Promise.reject();
+                    }
                     return new Promise((resolve, reject) => {
+                        console.log(this.value);
                         const fields = { [name]: this.validatingValue === undefined ? this.value : this.validatingValue };
                         validator.validate(fields, Object.assign({ firstFields: true }, this.validatingOptions), (errors, fields) => {
                             this.pending = false;
@@ -307,8 +315,9 @@ export const UValidator = {
                                 this.color = this.state;
                             if (!untouched && this.muted !== 'all' && this.muted !== 'message')
                                 this.currentMessage = errors ? errors[0].message : this.message;
-
+                            console.log(!this.mutedMessage ,this.touched ,!this.valid,this.firstError);
                             this.onValidate();
+                            console.log(errors);
                             // this.dispatch('u-form', 'validate-item-vm', !errors);
                             errors ? reject(errors) : resolve(); // @TODO
                         });

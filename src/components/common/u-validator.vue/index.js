@@ -302,7 +302,6 @@ export const UValidator = {
                         return Promise.reject();
                     }
                     return new Promise((resolve, reject) => {
-                        console.log(this.value);
                         const fields = { [name]: this.validatingValue === undefined ? this.value : this.validatingValue };
                         validator.validate(fields, Object.assign({ firstFields: true }, this.validatingOptions), (errors, fields) => {
                             this.pending = false;
@@ -315,9 +314,8 @@ export const UValidator = {
                                 this.color = this.state;
                             if (!untouched && this.muted !== 'all' && this.muted !== 'message')
                                 this.currentMessage = errors ? errors[0].message : this.message;
-                            console.log(!this.mutedMessage ,this.touched ,!this.valid,this.firstError);
+                            //console.log(!this.mutedMessage ,this.touched ,!this.valid,this.firstError, this.state, this.color);
                             this.onValidate();
-                            console.log(errors);
                             // this.dispatch('u-form', 'validate-item-vm', !errors);
                             errors ? reject(errors) : resolve(); // @TODO
                         });

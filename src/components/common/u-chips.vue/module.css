@@ -180,8 +180,9 @@
     background-color: #fff;
 }
 
-.root textarea.textareaFocus {
+.root .textareaFocus {
     border: 1px dashed #e1e8ed;
+    border-radius: 12px;
 }
 
 .root input.inputError, .root textarea.textareaError {

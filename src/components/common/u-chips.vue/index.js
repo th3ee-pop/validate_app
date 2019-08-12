@@ -124,6 +124,9 @@ export default {
             window.removeEventListener('mousedown', this.onDocMousedown, false);
     },
     methods: {
+        catchValidation(event) {
+            this.errMessage = event.firstError;
+        },
         /**
          * 进行验证的逻辑,validate是不关注当前事件是blur或input的
          * @param {string} value - 当前检测值
@@ -240,10 +243,10 @@ export default {
         onModifyBlur(event) {
             if (this.asyncChecking)
                 return;
-            this.generate(this.modifyItem, true);
-
-            if (!this.errMessage && !this.async)
-                this.$refs.cpInput.focus();
+            /**
+             * 修改时的验证，对应找到验证器为modifyValidator，修改内容全部通过后，才会聚焦到新增输入框上
+             */
+            this.generate(this.modifyItem, true, `modifyValidator`);
         },
         /**
          * 整个大的框聚焦
@@ -269,10 +272,9 @@ export default {
          * @param {object} event - 包装事件对象
          */
         onInputBlur(event) {
-            console.log('bluring');
             if (this.asyncChecking)
                 return;
-            this.generate(this.item);
+            this.generate(this.item, false, 'textValidator');
             this.focus = false;
 
             // if (this.errMessage)
@@ -305,13 +307,7 @@ export default {
                 // 生成项(满足相关要求)
                 event.preventDefault();
                 if (this.$refs.cpInput.$refs.input === document.activeElement && item) {
-                    this.generate(item);
-                    // 通过空格||逗号正常生成项之后，会残留字符。重置
-                    /*if (!this.errMessage && !this.async) {
-                        setTimeout(() => {
-                            this.item = '';
-                        });
-                    }*/
+                    this.generate(item, false, 'textValidator');
                 }
             }
             // 左键 || backspace 切换focus项
@@ -325,7 +321,7 @@ export default {
         onAddInput() {
             // 处理用户复制粘贴多个以空格符分割开的字符串
             if (!this.item.endsWith(' ') && this.item.includes(' ')) {
-                this.generate(this.item);
+                this.generate(this.item, false, 'textValidator');
                 this.$refs.cpInput.$refs.input.focus();
             }
         },
@@ -347,10 +343,9 @@ export default {
             // 空格键  生成项
             if (event.which === 32 || event.which === 188 || (this.type === 'searchInput' && event.which === 13)) { // searchInput 回车键添加项
                 // 生成项(满足相关要求)
-                if (this.getCpModifyInput() === document.activeElement && modifyItem) {
+                event.preventDefault();
+                if (this.getCpModifyInput().$refs.input === document.activeElement && modifyItem) {
                     this.getCpModifyInput().blur();
-                    if (!this.errMessage && !this.async)
-                        this.$refs.cpInput.focus();
                 }
             }
 
@@ -390,16 +385,21 @@ export default {
          * @param {object} event - 包装的event对象
          */
         onDBLClick(index, event) {
+            console.log(index, this.list.length);
             if (this.asyncChecking || this.errMessage)
                 return;
-            this.modifyItem = this.list[index];
+            if (index === this.list.length - 1) {
+                this.item = this.list[index];
+            } else {
+                this.modifyItem = this.list[index];
+            }
             this.current = index;
             this.modifying = true;
             // 在list当中去除当前的编辑项
             this.list.splice(index, 1);
             this.$emit('input', this.list);
             this.$nextTick(() => {
-                this.getCpModifyInput().focus();
+                index === this.list.length ? this.$refs.cpInput.focus() : this.getCpModifyInput().focus();
             });
         },
         /**
@@ -407,8 +407,7 @@ export default {
          * @param {string} item - 生成项的内容
          * @param {boolean} [isModify=false] - 是否是编辑已生成项
          */
-        generate(item, isModify = false) {
-            console.log('generating');
+        generate(item, isModify = false, validator) {
             if (this.type === 'searchInput' && /^\s*$/.test(item))
                 return;
             // item == false，说明item为空字符串或空格组成的字符串
@@ -439,70 +438,30 @@ export default {
             if (this.async)
                 return this.asyncGenerate(item, isModify, itemArr);
 
-            this.validateQueue(itemArr, this.$refs).then(res => {
-                this.list= this.list.concat(itemArr);
-                this.item = '';
-                this.$refs.cpInput.currentValue = this.item;
+            this.validateQueue(itemArr, this.$refs, validator).then(res => {
+                /**
+                 * 新增状态下和修改状态下，数组的操作方式有所不同，但验证方式是相同的。
+                 */
+                if (!isModify) {
+                    this.list= this.list.concat(itemArr);
+                    this.item = '';
+                    this.$refs.cpInput.currentValue = this.item;
+                } else {
+                    this.list.splice(this.current, 0, ...itemArr);
+                    this.$refs.cpModifyInput.currentValue = this.modifyItem = '';
+                    this.$refs.cpInput.focus();
+                }
             }).catch(e => {
-                this.list = this.list.concat(itemArr.splice(0, e));
-                const str = itemArr.join(' ');
-                isModify ? (this.modifyItem = str) : (this.item = str);
-                this.$refs.cpInput.currentValue = this.item;
+                if (!isModify) {
+                    this.list = this.list.concat(itemArr.splice(0, e));
+                    this.item = itemArr.join(' ');
+                    this.$refs.cpInput.currentValue = this.item;
+                } else {
+                    this.list.splice(this.current, 0, ...itemArr.splice(0, e));
+                    this.modifyItem = itemArr.join(' ');
+                    this.$refs.cpModifyInput.currentValue = this.modifyItem;
+                }
             });
-            /*let validatePromise = new Promise((resolve, reject) => {
-                itemArr.forEach((item, index) => {
-                    this.$refs.textValidator.value = item;
-                    this.$refs.textValidator.validate('input').then(res => {
-                        console.log(index,res);
-                        arrIndex = index + 1;
-                        if (index === itemArr.length - 1) {
-                            resolve(arrIndex);
-                        }
-                    }, e => {
-                        reject(index);
-                    })
-                });
-            });*/
-
-            //this.$refs.cpInput.currentValue = '';
-            /*const validateArr = itemArr.map((item) => {
-                return this.$refs.textValidator.validate('input').then(res => {
-                    console.log(res);
-                    this.list.push(item);
-                    itemArr.shift();
-                    this.$refs.textValidator.value = itemArr.join(' ');
-                })
-            });
-            this.promiseQueue(validateArr).catch(e => {
-                console.log(e);
-            });*/
-            /*itemArr.every((itm, index) => {
-                this.validate(itm, 'input+blur');
-                this.$refs.textValidator.validate('input + blur').then(res => {
-                    console.log(res);
-                    this.list.push(itm);
-                    this.$emit('input', this.list);
-                    arrIndex = index + 1;
-                    return true;
-                }).catch(e => {
-                    console.log(e);
-                    return false;
-                });*/
-                /*if (this.errMessage)
-                    return false;
-                else {
-                    // 编辑生成项
-                    if (isModify) {
-                        // 只有正确输入的情况下，才需要先删除之前的项
-                        this.list.splice(this.current, 0, itm);
-                    // 创建新生成项
-                    } else
-                        this.list.push(itm);
-                    this.$emit('input', this.list);
-                    arrIndex = index + 1;
-                    return true;
-                }*/
-            //});
         },
         asyncGenerate(item, isModify, itemArr) {
             let promise = Promise.resolve();
@@ -605,11 +564,20 @@ export default {
                 this.morePosRight = this.$refs.wrapper.clientWidth - lastEle.offsetLeft - lastEle.offsetWidth + 52;
             });
         },
-        async validateQueue(itemArr, $refs) {
+        /**
+         * 用于检验输入字符的函数，将各个分割后的字符转为按序的promise进行验证
+         * @param itemArr 字符串数组
+         * @param $refs 当前组件ref
+         * @param validator 对应的验证器（由于验证会修改validator中的值，所以必须修改到相应的validator中）
+         * @returns {Promise.<string>}
+         */
+        async validateQueue(itemArr, $refs, validator) {
+            const targetValidator = Array.isArray($refs[validator]) ? $refs[validator][0] :  $refs[validator];
             for (let i = 0 ;i < itemArr.length; i++) {
                 try {
-                    this.$refs.textValidator.value = itemArr[i];
-                    await $refs.textValidator.validate('blur').then(res => {
+                    targetValidator.value = itemArr[i];
+                    await targetValidator.validate('blur').then(res => {
+                        console.log('pass');
                     })
                 } catch (e) {
                     throw (i);

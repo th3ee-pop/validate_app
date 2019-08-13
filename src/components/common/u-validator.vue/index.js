@@ -200,7 +200,7 @@ export const UValidator = {
             this.$nextTick(() => this.validate('blur').catch((errors) => errors));
         },
         validate(trigger = 'submit', untouched = false) {
-            console.log(trigger, this.value);
+            //console.log(trigger, this.value);
             if (this.currentTarget === 'validatorVMs') {
                 return Promise.all(this.validatorVMs.map((validatorVM) => validatorVM.validate('submit', untouched)
                     .catch((errors) => errors))).then((results) => {
@@ -307,14 +307,13 @@ export const UValidator = {
                             this.pending = false;
                             this.triggerValid = !errors;
                             this.realValid = this.triggerValid; // @TODO
-
                             this.state = this.triggerValid ? 'success' : 'error';
                             this.firstErrorMessage = errors ? errors[0].message : '';
                             if (!untouched && this.muted !== 'all' && this.muted !== 'color')
                                 this.color = this.state;
                             if (!untouched && this.muted !== 'all' && this.muted !== 'message')
                                 this.currentMessage = errors ? errors[0].message : this.message;
-                            //console.log(!this.mutedMessage ,this.touched ,!this.valid,this.firstError, this.state, this.color);
+                            console.log(!this.mutedMessage ,this.touched ,!this.valid,this.firstError, this.state, this.color);
                             this.onValidate();
                             // this.dispatch('u-form', 'validate-item-vm', !errors);
                             errors ? reject(errors) : resolve(); // @TODO

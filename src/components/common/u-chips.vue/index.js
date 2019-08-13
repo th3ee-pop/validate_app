@@ -49,6 +49,7 @@ export default {
         },
         list(value, oldValue) {
             this.$emit('change', { value, oldValue });
+            this.emptyValidate();
         },
         value(value) {
             this.list = value;
@@ -93,17 +94,47 @@ export default {
             const maxRows = (this.list.length / 4 > 6) ? 6 : (this.list.length / 4);
             return maxRows * 36;
         },
+        /**
+         * 同步规则过滤
+         * @returns {Array.<*>}
+         */
         syncRules() {
             const rules = this.rules || [];
             return rules.filter((r) => r.type !== 'async');
         },
+        /**
+         * 异步规则过滤
+         * @returns {Array.<*>}
+         */
         asyncRules() {
             const rules = this.rules || [];
             return rules.filter((r) => r.type === 'async');
         },
+        /**
+         * 是否存在异步规则
+         * @returns {boolean}
+         */
         async() {
             return this.asyncRules.length > 0;
         },
+        countRules() {
+            const rules = [];
+            if (!this.allowEmpty) {
+                rules.push({
+                    type: 'string', trigger: 'blur', message: this.error, validator: (rule, value, callback) => {
+                        if (!this.list.length && !this.item) {
+                            callback(new Error());
+                        } else {
+                            callback();
+                        }
+                    }
+                })
+            }
+            return rules;
+        },
+        chipRules() {
+            return this.formatOldRules();
+        }
     },
     created() {
         window.addEventListener('keydown', this.onDocKeydown, false);
@@ -124,68 +155,82 @@ export default {
             window.removeEventListener('mousedown', this.onDocMousedown, false);
     },
     methods: {
+        /**
+         * 用于将原u-chips的验证方法转化为validator可识别的rule，需要对is，isNOT，method三种类型分别处理
+         */
+        formatOldRules() {
+            console.log(this.asyncRules);
+            return this.new_rules.map(oldRule => {
+                if ((oldRule.type === 'is' || oldRule.type === 'isNot' || oldRule.type === 'method') && oldRule.options) {
+                    /**
+                     * method类型，主要目标是将原u-chips的验证回调函数的逻辑转化为validator的验证逻辑。
+                     */
+                    if (oldRule.type === 'method') {
+                        return {type: 'string', trigger: 'blur', message: oldRule.message, validator: (rule, value, callback)=> {
+                            rule.message = oldRule.message;
+                            if (!oldRule.options(value, oldRule, this.list)) {
+                                callback(new Error())
+                            } else {
+                                callback();
+                            }
+                        }}
+                    } else if (oldRule.type === 'is') {
+                        return {type: 'string', trigger: 'blur', message: oldRule.message, pattern: oldRule.options}
+                    } else if (oldRule.type === 'isNot') {
+                        return {type: 'string', trigger: 'blur', message: oldRule.message, validator: (rule, value, callback)=> {
+                            rule.message = oldRule.message;
+                            if (oldRule.options.test(value)) {
+                                callback(new Error())
+                            } else {
+                                callback();
+                            }
+                        }}
+                    }
+
+                } else if (oldRule.type === 'async' && oldRule.validator) {
+                    return {  type: 'string',  trigger: oldRule.trigger, message: oldRule.message, validator: (rule, value, callback) => {
+                        oldRule.validator(oldRule, value, res => {
+                            console.log(res);
+                            rule.message = oldRule.message;
+                            res instanceof Error ? callback(new Error()) : callback();
+                        })
+                    } }
+                }
+                return oldRule;
+            });
+        },
+        /**
+         * new捕获所有得到的验证信息
+         * @param event
+         */
         catchValidation(event) {
             this.errMessage = event.firstError;
         },
         /**
-         * 进行验证的逻辑,validate是不关注当前事件是blur或input的
-         * @param {string} value - 当前检测值
-         * @param {string} [type='input'] - 事件种类
-         * @return 错误信息，没有错误返回空字符
+         * 测试阶段，检测数量
          */
-        validate(value, type = 'input', list) {
-            list = list || this.list;
-            // 空值或已经有错误信息不检测
-            if (!value && value !== '0' || this.errMessage) {
-                this.emitValidate(value);
-                return;
-            }
-            // 未通过检查的某项
-            const errRule = this.syncRules.find((rule) => {
-                // result为true表示通过了该条验证逻辑
-                let result = false;
-                if (!type.includes(rule.trigger))
-                    return false;
-                if (rule.type === 'method')
-                    result = rule.options(value, rule, list);
-                if (rule.type === 'is')
-                    result = rule.options.test(value, list);
-                if (rule.type === 'isNot')
-                    result = !rule.options.test(value, list);
+        checkCount() {
+            this.$refs.countValidator.validate('blur').then(res => {
+                console.log(res);
+            }).catch(e => {
+                console.log(e);
+            })
+        },
 
-                return !result;
-            });
-            if (errRule || !this.async) { // 同步校验不通过，或者不存在异步校验规则，直接结束
-                this.errMessage = errRule ? errRule.message : '';
-                this.emitValidate(value);
-            } else
-                return this.asyncValidate(value, type, list);
-        },
-        asyncValidate(value, type) {
-            let promise = Promise.resolve();
-            this.asyncRules.filter((r) => type.includes(r.trigger)).forEach((rule) => {
-                promise = promise.then(() => new Promise((res, rej) => {
-                    rule.validator(rule, value, (error) => {
-                        if (error === undefined) {
-                            this.errMessage = '';
-                            this.emitValidate(value);
-                            res();
-                        } else if (error instanceof Error) {
-                            this.errMessage = rule.message;
-                            this.emitValidate(value);
-                            rej();
-                        }
-                    });
-                }));
-            });
-            return promise;
-        },
+        /**
+         * 全局监听鼠标点击事件
+         * @param event
+         */
         onDocMousedown(event) {
             this.isFocused = this.$refs.box.contains(event.target);
             if (this.$refs.moreTag && this.$refs.moreTag.contains(event.target)) { // 点击更多，监听click事件不行
                 setTimeout(() => this.onFieldClick(), 500);
             }
         },
+        /**
+         * 全局监听键盘按下事件
+         * @param event
+         */
         onDocKeydown(event) {
             let { current, list, modifying, modifyItem } = this;
             if (current < 0)
@@ -237,17 +282,7 @@ export default {
                 this.$refs.cpInput.focus();
             }
         },
-        /**
-         * 编辑框失焦
-         */
-        onModifyBlur(event) {
-            if (this.asyncChecking)
-                return;
-            /**
-             * 修改时的验证，对应找到验证器为modifyValidator，修改内容全部通过后，才会聚焦到新增输入框上
-             */
-            this.generate(this.modifyItem, true, `modifyValidator`);
-        },
+
         /**
          * 整个大的框聚焦
          */
@@ -299,7 +334,7 @@ export default {
             // 当input内容为空，恢复tab的默认操作
             if (event.which === 9 && item !== '') {
                 event.preventDefault();
-                this.generate(item);
+                this.generate(item, false, 'textValidator');
                 this.$refs.cpInput.focus();
             }
             // 空格键 生成项 回车键
@@ -324,6 +359,17 @@ export default {
                 this.generate(this.item, false, 'textValidator');
                 this.$refs.cpInput.$refs.input.focus();
             }
+        },
+        /**
+         * 编辑框失焦
+         */
+        onModifyBlur(event) {
+            if (this.asyncChecking)
+                return;
+            /**
+             * 修改时的验证，对应找到验证器为modifyValidator，修改内容全部通过后，才会聚焦到新增输入框上
+             */
+            this.generate(this.modifyItem, true, `modifyValidator`);
         },
         /**
          * 修改输入框的键盘输入
@@ -417,7 +463,10 @@ export default {
                 else
                     this.item = '';
                 this.emptyValidate();
-
+                if (validator === 'modifyValidator') {
+                    this.modifying = false;
+                    this.$refs.cpInput.focus();
+                }
                 return;
             }
 
@@ -438,31 +487,57 @@ export default {
             if (this.async)
                 return this.asyncGenerate(item, isModify, itemArr);
 
-            this.validateQueue(itemArr, this.$refs, validator).then(res => {
+            this.validateQueue(itemArr, isModify, validator).then(res => {
                 /**
                  * 新增状态下和修改状态下，数组的操作方式有所不同，但验证方式是相同的。
                  */
                 if (!isModify) {
-                    this.list= this.list.concat(itemArr);
                     this.item = '';
                     this.$refs.cpInput.currentValue = this.item;
                 } else {
-                    this.list.splice(this.current, 0, ...itemArr);
                     this.$refs.cpModifyInput.currentValue = this.modifyItem = '';
                     this.$refs.cpInput.focus();
                 }
             }).catch(e => {
+                itemArr.splice(0, e);
                 if (!isModify) {
-                    this.list = this.list.concat(itemArr.splice(0, e));
                     this.item = itemArr.join(' ');
                     this.$refs.cpInput.currentValue = this.item;
                 } else {
-                    this.list.splice(this.current, 0, ...itemArr.splice(0, e));
                     this.modifyItem = itemArr.join(' ');
                     this.$refs.cpModifyInput.currentValue = this.modifyItem;
                 }
             });
         },
+        /**
+         * 用于检验输入字符的函数，将各个分割后的字符转为按序的promise进行验证
+         * @param itemArr 字符串数组
+         * @param isModify 用于区别是否是修改态
+         * @param validator 对应的验证器（由于验证会修改validator中的值，所以必须修改到相应的validator中）
+         * @returns {Promise.<string>}
+         */
+        async validateQueue(itemArr, isModify, validator) {
+            const targetValidator = Array.isArray(this.$refs[validator]) ? this.$refs[validator][0] :  this.$refs[validator];
+            for (let i = 0 ;i < itemArr.length; i++) {
+                try {
+                    targetValidator.value = itemArr[i];
+                    await targetValidator.validate('blur').then(res => {
+                        isModify ? this.list.splice(this.current, 0 ,itemArr[i]) : this.list.push(itemArr[i]);
+                        this.$emit('input', this.list);
+                    })
+                } catch (e) {
+                    throw (i);
+                }
+            }
+            return 'success!';
+        },
+        /**
+         * 存在异步规则时的校验逻辑。逐项送进校验器，先进行同步校验，再进行异步校验。
+         * @param item  无用
+         * @param isModify  是否是修改态
+         * @param itemArr   项目数组
+         * @returns {Promise.<TResult>}
+         */
         asyncGenerate(item, isModify, itemArr) {
             let promise = Promise.resolve();
             let arrIndex = 0;
@@ -494,6 +569,65 @@ export default {
                         this.$refs.cpInput.focus();
                     });
                 });
+        },
+        /**
+         * 进行验证的逻辑,validate是不关注当前事件是blur或input的
+         * @param {string} value - 当前检测值
+         * @param {string} [type='input'] - 事件种类
+         * @return 错误信息，没有错误返回空字符
+         */
+        validate(value, type = 'input', list) {
+            list = list || this.list;
+            // 空值或已经有错误信息不检测
+            if (!value && value !== '0' || this.errMessage) {
+                this.emitValidate(value);
+                return;
+            }
+            // 未通过检查的某项
+            const errRule = this.syncRules.find((rule) => {
+                // result为true表示通过了该条验证逻辑
+                let result = false;
+                if (!type.includes(rule.trigger))
+                    return false;
+                if (rule.type === 'method')
+                    result = rule.options(value, rule, list);
+                if (rule.type === 'is')
+                    result = rule.options.test(value, list);
+                if (rule.type === 'isNot')
+                    result = !rule.options.test(value, list);
+
+                return !result;
+            });
+            if (errRule || !this.async) { // 同步校验不通过，或者不存在异步校验规则，直接结束
+                this.errMessage = errRule ? errRule.message : '';
+                this.emitValidate(value);
+            } else
+                return this.asyncValidate(value, type, list);
+        },
+        /**
+         * 异步验证函数，将异步规则串联为一个promise链，依次进行验证
+         * @param value 输入值
+         * @param type  事件种类
+         * @returns {Promise.<T>}
+         */
+        asyncValidate(value, type) {
+            let promise = Promise.resolve();
+            this.asyncRules.filter((r) => type.includes(r.trigger)).forEach((rule) => {
+                promise = promise.then(() => new Promise((res, rej) => {
+                    rule.validator(rule, value, (error) => {
+                        if (error === undefined) {
+                            this.errMessage = '';
+                            this.emitValidate(value);
+                            res();
+                        } else if (error instanceof Error) {
+                            this.errMessage = rule.message;
+                            this.emitValidate(value);
+                            rej();
+                        }
+                    });
+                }));
+            });
+            return promise;
         },
         /**
          * 删除某项
@@ -540,11 +674,13 @@ export default {
                 current: this.current === -1 ? this.list.length : this.current,
             });
         },
+        /**
+         * 检验是否为空，需要对原方法进行兼容
+         * @param value
+         */
         emptyValidate(value = '') {
-            if (!this.allowEmpty && !this.list.length) {
-                this.errMessage = this.error;
+                this.$refs.countValidator.validate('blur');
                 this.emitValidate(value);
-            }
         },
         deleteAll() {
             this.list = [];
@@ -564,26 +700,6 @@ export default {
                 this.morePosRight = this.$refs.wrapper.clientWidth - lastEle.offsetLeft - lastEle.offsetWidth + 52;
             });
         },
-        /**
-         * 用于检验输入字符的函数，将各个分割后的字符转为按序的promise进行验证
-         * @param itemArr 字符串数组
-         * @param $refs 当前组件ref
-         * @param validator 对应的验证器（由于验证会修改validator中的值，所以必须修改到相应的validator中）
-         * @returns {Promise.<string>}
-         */
-        async validateQueue(itemArr, $refs, validator) {
-            const targetValidator = Array.isArray($refs[validator]) ? $refs[validator][0] :  $refs[validator];
-            for (let i = 0 ;i < itemArr.length; i++) {
-                try {
-                    targetValidator.value = itemArr[i];
-                    await targetValidator.validate('blur').then(res => {
-                        console.log('pass');
-                    })
-                } catch (e) {
-                    throw (i);
-                }
-            }
-            return 'success!';
-        }
+
     },
 };

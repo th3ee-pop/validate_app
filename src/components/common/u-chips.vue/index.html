@@ -7,7 +7,7 @@
         <div :class="type==='searchInput' ? $style.inputWrapper : ''" ref="wrapper">
         <template v-for="(item, index) in list">
             <!-- 编辑的输入框 -->
-            <u-validator v-if="modifying && current === index" :rules="new_rules" ref="modifyValidator" validatingProcess="interval" @validate="catchValidation">
+            <u-validator v-if="modifying && current === index" :rules="chipRules" ref="modifyValidator" validatingProcess="interval" @validate="catchValidation">
                 <u-input :disabled="asyncChecking" type="text" v-model="modifyItem" ref="cpModifyInput" @keydown="onModifyKeydown" @blur="onModifyBlur"
                      :class="!!errMessage ? $style.inputError : ''" ></u-input>
             </u-validator>
@@ -17,7 +17,7 @@
             </div>
         </template>
         <!-- 添加新项的输入框 -->
-            <u-validator :rules="new_rules" ref="textValidator" validatingProcess="interval" @validate="catchValidation">
+            <u-validator :rules="chipRules" ref="textValidator" validatingProcess="interval" @validate="catchValidation">
                 <u-textarea-dash resize="none" :disabled="asyncChecking" :style="{ height: height + 'px', width: width + 'px' }" :class="[focus ? $style.textareaFocus : '', !!errMessage && !modifying ? $style.textareaError : '']"
                             ref="cpInput" type="text" @blur="onInputBlur" @focus="onInputFocus" @keydown="onKeydown"
                             @input="onAddInput" v-model="item">
@@ -31,7 +31,7 @@
         </div>
         <!-- input框类型有×按钮 -->
         <span v-if="type==='searchInput' && list && list.length > 0" :class="$style.closeAll" @click="deleteAll">&#215;</span>
-        <!-- 因为修改最后一项生成项，list已经没有了对应的项了 -->
+        <!-- 因为修改最后一项生成项，list已经没有了对应的项了(这个有必要吗？直接利用上面的textarea作为最后一项的编辑项即可？) -->
         <!--<u-validator v-if="modifying && current === list.length" :rules="new_rules" ref="modifyValidator" validatingProcess="interval">
             <u-input :disabled="asyncChecking"  type="text" v-model="modifyItem" ref="cpModifyInput" @keydown="onModifyKeydown" @blur="onModifyBlur"
                  :class="!!errMessage ? $style.inputError : ''">
@@ -40,6 +40,7 @@
 
         <!-- placeholder展示 -->
         <div v-if="!focus && !list.length && !errMessage && !asyncChecking && !item && !modifyItem" :class="$style.placeholder">{{placeholder}}</div>
+        <u-validator :rules="countRules" ref="countValidator" @validate="catchValidation"></u-validator>
     </div>
     <div v-else :class="$style.unitFieldDisabled" > </div>
 </div>

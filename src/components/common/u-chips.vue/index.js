@@ -48,8 +48,8 @@ export default {
             this.validate(value);
         },
         list(value, oldValue) {
-            this.$emit('change', { value, oldValue });
             this.emptyValidate();
+            this.$emit('change', { value, oldValue });
         },
         value(value) {
             this.list = value;
@@ -159,7 +159,6 @@ export default {
          * 用于将原u-chips的验证方法转化为validator可识别的rule，需要对is，isNOT，method三种类型分别处理
          */
         formatOldRules() {
-            console.log(this.asyncRules);
             return this.new_rules.map(oldRule => {
                 if ((oldRule.type === 'is' || oldRule.type === 'isNot' || oldRule.type === 'method') && oldRule.options) {
                     /**
@@ -189,7 +188,9 @@ export default {
 
                 } else if (oldRule.type === 'async' && oldRule.validator) {
                     return {  type: 'string',  trigger: oldRule.trigger, message: oldRule.message, validator: (rule, value, callback) => {
+                        this.asyncChecking = true;
                         oldRule.validator(oldRule, value, res => {
+                            this.asyncChecking = false;
                             console.log(res);
                             rule.message = oldRule.message;
                             res instanceof Error ? callback(new Error()) : callback();
@@ -205,20 +206,11 @@ export default {
          */
         catchValidation(event) {
             this.errMessage = event.firstError;
-        },
-        /**
-         * 测试阶段，检测数量
-         */
-        checkCount() {
-            this.$refs.countValidator.validate('blur').then(res => {
-                console.log(res);
-            }).catch(e => {
-                console.log(e);
-            })
+            this.emitValidate(event.value);
         },
 
         /**
-         * 全局监听鼠标点击事件
+         * 全局监听鼠标点击事件，type为searchInput时才调用
          * @param event
          */
         onDocMousedown(event) {
@@ -239,7 +231,7 @@ export default {
             if (event.which === 9) {
                 event.preventDefault();
                 if (modifying)
-                    this.generate(modifyItem, true);
+                    this.generate(modifyItem, true, 'modifyValidator');
                 else if (current === (list.length - 1))
                     this.$refs.cpInput.focus();
                 else
@@ -248,13 +240,25 @@ export default {
 
             // enter键
             // 这里没有进行current的判断，是因为函数一开始就判断了
+            /**
+             * 对enter按键的监听。如果是最后一项，则触发textarea的激活（因为在该版本下，取消了那个最后一项的特殊input），否则激活相应的input
+             */
             if (event.which === 13) {
+                event.preventDefault();
+                if (this.errMessage)
+                    return;
                 this.modifying = true;
-                this.modifyItem = list[current];
-                list.splice(current, 1);
-                this.$nextTick(() => {
-                    this.getCpModifyInput().focus();
-                });
+                if (current === (list.length - 1)) {
+                    this.item = list.splice(current, 1)[0];
+                    this.$nextTick(() => {
+                        this.$refs.cpInput.focus();
+                    })
+                }  else {
+                    this.modifyItem = list.splice(current, 1)[0];
+                    this.$nextTick(() => {
+                        this.getCpModifyInput().focus();
+                    });
+                }
             }
             // 键盘右键
             if (event.which === 39) {
@@ -309,6 +313,7 @@ export default {
         onInputBlur(event) {
             if (this.asyncChecking)
                 return;
+            event && event.stopPropagation();
             this.generate(this.item, false, 'textValidator');
             this.focus = false;
 
@@ -357,7 +362,7 @@ export default {
             // 处理用户复制粘贴多个以空格符分割开的字符串
             if (!this.item.endsWith(' ') && this.item.includes(' ')) {
                 this.generate(this.item, false, 'textValidator');
-                this.$refs.cpInput.$refs.input.focus();
+                this.$refs.cpInput.focus();
             }
         },
         /**
@@ -399,7 +404,7 @@ export default {
             // 当input内容为空，恢复tab的默认操作
             if (event.which === 9 && modifyItem !== '') {
                 event.preventDefault();
-                this.generate(modifyItem, true);
+                //this.generate(modifyItem, true);
                 this.getCpModifyInput().blur();
             }
 
@@ -414,7 +419,7 @@ export default {
         /**
          * 聚焦某个生成项
          * @param {number} index - 生成项的索引
-         * @param {object} event - 包装的event对象
+         * @param {object} $event - 包装的event对象
          */
         onFocus(index, $event) {
             if (this.asyncChecking)
@@ -431,16 +436,16 @@ export default {
          * @param {object} event - 包装的event对象
          */
         onDBLClick(index, event) {
-            console.log(index, this.list.length);
+            console.log(this.errMessage);
             if (this.asyncChecking || this.errMessage)
                 return;
             if (index === this.list.length - 1) {
                 this.item = this.list[index];
             } else {
                 this.modifyItem = this.list[index];
+                this.modifying = true;
             }
             this.current = index;
-            this.modifying = true;
             // 在list当中去除当前的编辑项
             this.list.splice(index, 1);
             this.$emit('input', this.list);
@@ -452,6 +457,7 @@ export default {
          * 生成项（包括一次生成多个项）
          * @param {string} item - 生成项的内容
          * @param {boolean} [isModify=false] - 是否是编辑已生成项
+         * @param {string} validator - 将值传入的目标验证器
          */
         generate(item, isModify = false, validator) {
             if (this.type === 'searchInput' && /^\s*$/.test(item))
@@ -506,6 +512,7 @@ export default {
                 } else {
                     this.modifyItem = itemArr.join(' ');
                     this.$refs.cpModifyInput.currentValue = this.modifyItem;
+                    this.getCpModifyInput().focus();
                 }
             });
         },
@@ -634,13 +641,13 @@ export default {
          * @param {number} index - 某项的索引
          */
         deleteItem(index) {
+            console.log('deleting');
             if (this.asyncChecking)
                 return;
             this.list.splice(index, 1);
             this.$emit('input', this.list);
             const item = this.modifying ? this.modifyItem : this.item;
             this.validate(item, 'input+blur');
-            this.emptyValidate();
         },
         /**
          * 外部调用看数据是否合法
@@ -679,8 +686,10 @@ export default {
          * @param value
          */
         emptyValidate(value = '') {
-                this.$refs.countValidator.validate('blur');
-                this.emitValidate(value);
+            this.$refs.countValidator.validate('blur').catch(e => {
+                console.log(e);
+            });
+            this.emitValidate(value);
         },
         deleteAll() {
             this.list = [];

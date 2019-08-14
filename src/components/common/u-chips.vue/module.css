@@ -162,9 +162,80 @@
     margin-top: 8px;
 }
 
-.root input {
+/*.root input {
     width: 145px;
     border: 1px dashed #e1e8ed;
+}*/
+
+.textarea[class] {
+    box-sizing: border-box;
+    border-color: transparent;
+    outline: 0;
+    line-height: 30px;
+    min-height: 0;
+}
+
+.textarea[class][focus] {
+    border-color: #e1e8ed;
+}
+
+.textarea[class] textarea{
+    margin: 0
+}
+
+.textareaFocus[class] {
+    box-sizing: border-box;
+    margin: 5px 0 0 5px;
+    border: 1px dashed #e1e8ed;
+    border-radius: 12px;
+    line-height: 30px;
+    min-height: 0;
+}
+
+.textareaFocus[class] textarea{
+    margin: 0
+}
+
+.textareaError[class] {
+    box-sizing: border-box;
+    margin: 5px 0 0 5px;
+    border-radius: 12px;
+    line-height: 30px;
+    border-style: solid;
+    border-color: red;
+    min-height: 0;
+}
+
+.textareaError[class][focus] {
+    border-color: red;
+}
+
+.input[class] {
+     box-sizing: border-box;
+     line-height: 40px;
+     width: 145px;
+     border: 1px dashed #e1e8ed;
+     border-radius: 12px;
+     margin: 0 0 0 5px;
+     height: 26px;
+ }
+
+.input[class] input{
+    margin: 0;
+}
+
+.inputError[class] {
+    box-sizing: border-box;
+    line-height: 40px;
+    width: 145px;
+    border: 1px solid red;
+    border-radius: 12px;
+    margin: 0 0 0 5px;
+    height: 26px;
+}
+
+.inputError[class] input{
+    margin: 0;
 }
 
 .root input:disabled{
@@ -180,10 +251,6 @@
     background-color: #fff;
 }
 
-.root .textareaFocus {
-    border: 1px dashed #e1e8ed;
-    border-radius: 12px;
-}
 
 .root input.inputError, .root textarea.textareaError {
     border-style: solid;

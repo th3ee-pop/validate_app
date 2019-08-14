@@ -28,7 +28,7 @@
                         <u-input size="huge normal" placeholder="1-65535内的整数"></u-input>
                     </u-validator>
                     <u-validator>
-                        <u-chips v-model="chipList" :new_rules="chipRules" :allowEmpty="false" error="不能为空啊！！！" @input="testinput">
+                        <u-chips placeholder="请输入" v-model="chipList" :new_rules="chipRules"  :allowEmpty="false" error="不能为空啊！！！">
                         </u-chips>
                     </u-validator>
                 </u-linear-layout>
@@ -68,7 +68,7 @@ export default {
                 ],
             },
             chipRules: [
-                { type: 'async', trigger: 'blur', message: '包含a', validator: (rule, value, callback) => {
+                /*{ type: 'async', trigger: 'blur', message: '包含a', validator: (rule, value, callback) => {
                     console.log(value);
                    let asyncPromise = new Promise((resolve, reject) => {
                        setTimeout(() => {
@@ -80,16 +80,23 @@ export default {
                        }, 1500);
                    });
                     asyncPromise.then(res => callback()).catch(e => callback(new Error()))
-                } },
-                { type: 'string', min: 4, max: 12, trigger: 'input+blur', message: '请输入4~12个字符' },
-                { type: 'method', trigger: 'blur',message:'最多五个', options: (value, rule, list) => {
-                    return !(this.chipList.length >= 5);
+                } },*/
+                { type: 'string', min: 4, max: 12, trigger: 'blur', message: '请输入4~12个字符' },
+                { type: 'string', trigger: 'input', message: '包含a', validator: (rule, value, callback) => {
+                    if (value.indexOf('a') > -1) {
+                        callback(new Error());
+                    } else {
+                        callback();
+                    }
+                }},
+                { type: 'method', trigger: 'blur',message:'最多10个', options: (value, rule, list) => {
+                    return !(this.chipList.length >= 10);
                 }},
                 { type: 'method', trigger: 'blur',message:'有重复值', options: (value, rule, list) => {
                     return !(this.chipList.includes(value));
                 }},
             ],
-            chipList: ['123456', '1234']
+            chipList: ['202', '222a', '222a']
         };
     },
     mounted() {

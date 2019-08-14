@@ -185,7 +185,6 @@ export const UValidator = {
         onFocus() {
             if (this.currentTarget === 'validatorVMs')
                 return;
-
             this.color = 'focus';
             this.currentMessage = this.message;
         },
@@ -296,7 +295,7 @@ export const UValidator = {
                         [name]: rules,
                     });
                     /**
-                     * 判断如果检验类型是间断式，则只验证第一个间断项
+                     * 判断如果检验类型是间断式，则不处理第一次输入事件的字符串，而是等chips中主动调用
                      */
                     if (this.validatingProcess === 'interval' && this.value.split(/\s|,/).length > 1) {
                         return Promise.reject();

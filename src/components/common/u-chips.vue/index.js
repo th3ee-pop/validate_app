@@ -7,7 +7,7 @@ export default {
         // [{ type: 'async', trigger: 'blur', message: '', validator(rule, value, callback){}]
         // 校验通过，执行callback();校验失败，执行callback(new Error())
         rules: Array,
-        new_rules: Array,
+        listRules: Array,
         noSpace: Boolean,
         disabled: Boolean,
         placement: String,
@@ -38,29 +38,42 @@ export default {
     },
     watch: {
         item(value) {
-            // if (!value)
-            //     return;
+            if (this.validationMode === 'old')
             this.validate(value);
         },
         modifyItem(value) {
-            // if (!value)
-            //     return;
+            if (this.validationMode === 'old')
             this.validate(value);
         },
+        /**
+         * chip数量变化时触发
+         * @param value
+         * @param oldValue
+         */
         list(value, oldValue) {
-            this.emptyValidate();
+            //this.emptyValidate();
             this.$emit('change', { value, oldValue });
         },
+        /**
+         * value属性（父组件传入的数组）变化时触发
+         * @param value
+         */
         value(value) {
             this.list = value;
         },
+        /**
+         * 空校验（新版未用到）
+         */
         modifying() {
             if (!this.modifying && !this.list.length && !this.allowEmpty)
                 this.errMessage = this.error;
         },
     },
     computed: {
-        // textarea每行的字数
+        /**
+         * 动态样式设定
+         * @returns {number}
+         */
         width() {
             const length = this.item.length;
             const width = length * 8.5 + 20;
@@ -95,7 +108,7 @@ export default {
             return maxRows * 36;
         },
         /**
-         * 同步规则过滤
+         * 同步规则过滤（新版未用到）
          * @returns {Array.<*>}
          */
         syncRules() {
@@ -103,7 +116,7 @@ export default {
             return rules.filter((r) => r.type !== 'async');
         },
         /**
-         * 异步规则过滤
+         * 异步规则过滤（新版未用到）
          * @returns {Array.<*>}
          */
         asyncRules() {
@@ -111,14 +124,18 @@ export default {
             return rules.filter((r) => r.type === 'async');
         },
         /**
-         * 是否存在异步规则
+         * 是否存在异步规则（新版未用到）
          * @returns {boolean}
          */
         async() {
             return this.asyncRules.length > 0;
         },
+        /**
+         * 这里针对单独进行空验证的validator的规则数组进行了判断，当满足allowEmpty为false时，则添加空验证规则。
+         * @returns {Array}
+         */
         countRules() {
-            const rules = [];
+            let rules = [];
             if (!this.allowEmpty) {
                 rules.push({
                     type: 'string', trigger: 'blur', message: this.error, validator: (rule, value, callback) => {
@@ -130,10 +147,20 @@ export default {
                     }
                 })
             }
+            rules = rules.concat(this.listRules);
             return rules;
         },
-        chipRules() {
-            return this.formatOldRules();
+        /**
+         * textarea和input两种组件的validator的规则数组，通过formatOldRules方法来进行规则的统一（将老规则转化为新规则）
+         * @returns {*}
+         */
+        validationMode() {
+            const oldRules = this.rules.filter(oldRule => {
+                if ((oldRule.type === 'is' || oldRule.type === 'isNot' || oldRule.type === 'method') && oldRule.options) {
+                    return oldRule;
+                }
+            });
+           return oldRules.length > 0 ? 'old': 'new';
         }
     },
     created() {
@@ -149,6 +176,9 @@ export default {
         }
         this.$emit('validMethod', this.submitValidate);
     },
+    mounted() {
+        console.log(this.validationMode);
+    },
     destroyed() {
         window.removeEventListener('keydown', this.onDocKeydown, false);
         if (this.type === 'searchInput')
@@ -156,10 +186,10 @@ export default {
     },
     methods: {
         /**
-         * 用于将原u-chips的验证方法转化为validator可识别的rule，需要对is，isNOT，method三种类型分别处理
+         * 用于将原u-chips的验证方法转化为validator可识别的rule，需要对is，isNOT，method以及async四种类型分别处理
          */
         formatOldRules() {
-            return this.new_rules.map(oldRule => {
+            return this.rules.map(oldRule => {
                 if ((oldRule.type === 'is' || oldRule.type === 'isNot' || oldRule.type === 'method') && oldRule.options) {
                     /**
                      * method类型，主要目标是将原u-chips的验证回调函数的逻辑转化为validator的验证逻辑。
@@ -298,7 +328,7 @@ export default {
                 this.$refs.cpInput.focus();
         },
         /**
-         * 创建输入框的focus事件回调
+         * 新增项textarea框的focus事件回调
          * @param {object} event - 包装事件对象
          */
         onInputFocus(event) {
@@ -307,7 +337,7 @@ export default {
             this.focus = true;
         },
         /**
-         * 创建输入框的blur事件回调
+         * 新增项的blur事件回调
          * @param {object} event - 包装事件对象
          */
         onInputBlur(event) {
@@ -321,7 +351,7 @@ export default {
             //     this.$refs.cpInput && this.$refs.cpInput.focus();
         },
         /**
-         * 编辑框的键盘事件
+         * 新增项的textarea框的键盘事件
          * @param {object} event - 事件的包装对象
          */
         onKeydown(event) {
@@ -358,12 +388,34 @@ export default {
                 this.onFocus(list.length - 1);
             }
         },
+        /**
+         * 针对以空格连接的字符串的一次性粘贴处理入口 + 手动触发input类型的检验事件
+         */
         onAddInput() {
-            // 处理用户复制粘贴多个以空格符分割开的字符串
             if (!this.item.endsWith(' ') && this.item.includes(' ')) {
                 this.generate(this.item, false, 'textValidator');
                 this.$refs.cpInput.focus();
+            } else {
+                this.$refs.textValidator.value = this.item;
+                this.$refs.textValidator.validate('input');
             }
+        },
+        /**
+         * 手动触发input类型的检验事件
+         */
+        onModifyInput() {
+            if (this.modifyItem.endsWith(' ') || !this.modifyItem.includes(' ')) {
+                console.log(this.$refs.modifyValidator);
+                this.$refs.modifyValidator[0].value = this.modifyItem;
+                this.$refs.modifyValidator[0].validate('input');
+            }
+        },
+        /**
+         * 获取修改输入框
+         * @returns {*}
+         */
+        getCpModifyInput() {
+            return this.$refs.cpModifyInput && (Array.isArray(this.$refs.cpModifyInput) ? this.$refs.cpModifyInput[0] : this.$refs.cpModifyInput);
         },
         /**
          * 编辑框失焦
@@ -375,6 +427,8 @@ export default {
              * 修改时的验证，对应找到验证器为modifyValidator，修改内容全部通过后，才会聚焦到新增输入框上
              */
             this.generate(this.modifyItem, true, `modifyValidator`);
+            if (!this.errMessage && !this.async && this.validationMode === 'old')
+                this.$refs.cpInput.focus();
         },
         /**
          * 修改输入框的键盘输入
@@ -397,6 +451,8 @@ export default {
                 event.preventDefault();
                 if (this.getCpModifyInput().$refs.input === document.activeElement && modifyItem) {
                     this.getCpModifyInput().blur();
+                    if (!this.errMessage && !this.async && this.validationMode === 'old')
+                        this.$refs.cpInput.focus();
                 }
             }
 
@@ -493,28 +549,59 @@ export default {
             if (this.async)
                 return this.asyncGenerate(item, isModify, itemArr);
 
-            this.validateQueue(itemArr, isModify, validator).then(res => {
-                /**
-                 * 新增状态下和修改状态下，数组的操作方式有所不同，但验证方式是相同的。
-                 */
-                if (!isModify) {
-                    this.item = '';
-                    this.$refs.cpInput.currentValue = this.item;
-                } else {
-                    this.$refs.cpModifyInput.currentValue = this.modifyItem = '';
-                    this.$refs.cpInput.focus();
-                }
-            }).catch(e => {
-                itemArr.splice(0, e);
-                if (!isModify) {
-                    this.item = itemArr.join(' ');
-                    this.$refs.cpInput.currentValue = this.item;
-                } else {
-                    this.modifyItem = itemArr.join(' ');
-                    this.$refs.cpModifyInput.currentValue = this.modifyItem;
-                    this.getCpModifyInput().focus();
-                }
-            });
+            /**
+             * 对规则模式进行校验，如果是老规则模式，走u-chips原始校验方法。如果是新规则，走u-chips新校验方法。
+             */
+            if (this.validationMode === 'new') {
+                this.validateQueue(itemArr, isModify, validator).then(res => {
+                    /**
+                     * 新增状态下和修改状态下，数组的操作方式有所不同，但验证方式是相同的。
+                     */
+                    if (!isModify) {
+                        this.item = '';
+                        this.$refs.cpInput.currentValue = this.item;
+                    } else {
+                        this.$refs.cpModifyInput.currentValue = this.modifyItem = '';
+                        this.$refs.cpInput.focus();
+                    }
+                }).catch(e => {
+                    itemArr.splice(0, e);
+                    if (!isModify) {
+                        this.item = itemArr.join(' ');
+                        this.$refs.cpInput.currentValue = this.item;
+                    } else {
+                        this.modifyItem = itemArr.join(' ');
+                        this.$refs.cpModifyInput.currentValue = this.modifyItem;
+                        this.getCpModifyInput().focus();
+                    }
+                });
+            } else {
+                itemArr.every((itm, index) => {
+                    this.validate(itm, 'input+blur');
+                    if (this.errMessage)
+                    {
+                        console.log(this.errMessage)
+                        return false;
+                    }
+                    else {
+                        // 编辑生成项
+                        if (isModify) {
+                            // 只有正确输入的情况下，才需要先删除之前的项
+                            this.list.splice(this.current, 0, itm);
+                            // 创建新生成项
+                        } else
+                            this.list.push(itm);
+                        this.$emit('input', this.list);
+                        arrIndex = index + 1;
+                        return true;
+                    }
+                });
+                itemArr.splice(0, arrIndex);
+
+                const str = itemArr.join(' ');
+                isModify ? (this.modifyItem = str) : (this.item = str);
+            }
+
         },
         /**
          * 用于检验输入字符的函数，将各个分割后的字符转为按序的promise进行验证
@@ -528,7 +615,9 @@ export default {
             for (let i = 0 ;i < itemArr.length; i++) {
                 try {
                     targetValidator.value = itemArr[i];
-                    await targetValidator.validate('blur').then(res => {
+                    let valueValidation = targetValidator.validate('blur');
+                    let countValidation = this.$refs.countValidator.validate('blur');
+                    await Promise.all([valueValidation, countValidation]).then(res => {
                         isModify ? this.list.splice(this.current, 0 ,itemArr[i]) : this.list.push(itemArr[i]);
                         this.$emit('input', this.list);
                     })
@@ -539,7 +628,7 @@ export default {
             return 'success!';
         },
         /**
-         * 存在异步规则时的校验逻辑。逐项送进校验器，先进行同步校验，再进行异步校验。
+         * 存在异步规则时的校验逻辑。逐项送进校验器，先进行同步校验，再进行异步校验。（新版未用到）
          * @param item  无用
          * @param isModify  是否是修改态
          * @param itemArr   项目数组
@@ -578,7 +667,7 @@ export default {
                 });
         },
         /**
-         * 进行验证的逻辑,validate是不关注当前事件是blur或input的
+         * 进行验证的逻辑,validate是不关注当前事件是blur或input的（新版未用到）
          * @param {string} value - 当前检测值
          * @param {string} [type='input'] - 事件种类
          * @return 错误信息，没有错误返回空字符
@@ -612,7 +701,7 @@ export default {
                 return this.asyncValidate(value, type, list);
         },
         /**
-         * 异步验证函数，将异步规则串联为一个promise链，依次进行验证
+         * 异步验证函数，将异步规则串联为一个promise链，依次进行验证（新版未用到）
          * @param value 输入值
          * @param type  事件种类
          * @returns {Promise.<T>}
@@ -670,9 +759,7 @@ export default {
             } else
                 return this.$checkValidity();
         },
-        getCpModifyInput() {
-            return this.$refs.cpModifyInput && (Array.isArray(this.$refs.cpModifyInput) ? this.$refs.cpModifyInput[0] : this.$refs.cpModifyInput);
-        },
+
         emitValidate(value) {
             this.$emit('validate', {
                 isValid: !!this.errMessage,
@@ -686,9 +773,15 @@ export default {
          * @param value
          */
         emptyValidate(value = '') {
-            this.$refs.countValidator.validate('blur').catch(e => {
-                console.log(e);
-            });
+            if (this.validationMode === 'new') {
+                this.$refs.countValidator.validate('blur').catch(e => {
+                    console.log(e);
+                });
+            } else {
+                if (!this.allowEmpty && !this.list.length) {
+                    this.errMessage = this.error;
+                }
+            }
             this.emitValidate(value);
         },
         deleteAll() {

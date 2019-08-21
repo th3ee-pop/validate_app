@@ -23,7 +23,7 @@ export const UValidator = {
         ignoreValidation: { type: Boolean, default: false },
         validatingOptions: Object,
         validatingValue: null,
-        validatingProcess: String
+        manual: {type: Boolean, default: false}
     },
     data() {
         return {
@@ -159,7 +159,7 @@ export const UValidator = {
                 this.$nextTick(() => this.validate('submit', true).catch((errors) => errors));
         },
         onInput(value) {
-            if (this.currentTarget === 'validatorVMs')
+            if (this.currentTarget === 'validatorVMs' || this.manual)
                 return;
             if (!this.fieldTouched)
                 this.fieldTouched = true;
@@ -172,14 +172,13 @@ export const UValidator = {
             });
         },
         onChange($event) {
-            if (this.currentTarget === 'validatorVMs')
+            if (this.currentTarget === 'validatorVMs' || this.manual)
                 return;
-
             if (!this.fieldTouched)
                 this.oldValue = $event.value;
             this.value = $event.value;
             // @compat: 以后推荐使用 @update & @input 事件
-            if (!this.hasUpdateEvent && !this.inputing && this.validatingProcess !== 'interval')
+            if (!this.hasUpdateEvent && !this.inputing)
                 this.validate('submit', true).catch((errors) => errors);
         },
         onFocus() {
@@ -189,17 +188,16 @@ export const UValidator = {
             this.currentMessage = this.message;
         },
         onBlur() {
-            if (this.currentTarget === 'validatorVMs')
+            if (this.currentTarget === 'validatorVMs' || this.manual)
                 return;
 
             if (!this.fieldTouched)
                 this.fieldTouched = true;
             this.color = this.state = '';
-            if (this.validatingProcess !== 'interval')
             this.$nextTick(() => this.validate('blur').catch((errors) => errors));
         },
         validate(trigger = 'submit', untouched = false) {
-            //console.log(trigger, this.value);
+            console.log(trigger, this.value);
             if (this.currentTarget === 'validatorVMs') {
                 return Promise.all(this.validatorVMs.map((validatorVM) => validatorVM.validate('submit', untouched)
                     .catch((errors) => errors))).then((results) => {
@@ -294,12 +292,6 @@ export const UValidator = {
                     const validator = new Validator({
                         [name]: rules,
                     });
-                    /**
-                     * 判断如果检验类型是间断式，则不处理第一次输入事件的字符串，而是等chips中主动调用
-                     */
-                    if (this.validatingProcess === 'interval' && this.value.split(/\s|,/).length > 1) {
-                        return Promise.reject();
-                    }
                     return new Promise((resolve, reject) => {
                         const fields = { [name]: this.validatingValue === undefined ? this.value : this.validatingValue };
                         validator.validate(fields, Object.assign({ firstFields: true }, this.validatingOptions), (errors, fields) => {
@@ -312,9 +304,7 @@ export const UValidator = {
                                 this.color = this.state;
                             if (!untouched && this.muted !== 'all' && this.muted !== 'message')
                                 this.currentMessage = errors ? errors[0].message : this.message;
-                            console.log(!this.mutedMessage ,this.touched ,!this.valid,this.firstError, this.state, this.color);
                             this.onValidate();
-                            // this.dispatch('u-form', 'validate-item-vm', !errors);
                             errors ? reject(errors) : resolve(); // @TODO
                         });
                     });

@@ -7,7 +7,7 @@
         <div :class="type==='searchInput' ? $style.inputWrapper : ''" ref="wrapper">
         <template v-for="(item, index) in list">
             <!-- 编辑的输入框 -->
-            <u-validator v-if="modifying && current === index" :rules="rules" ref="modifyValidator" :manual="true" @validate="catchValidation" muted="message">
+            <u-validator v-if="modifying && current === index" :rules="textRules" ref="modifyValidator" :manual="true" @validate="catchValidation" muted="message">
                 <u-input :disabled="asyncChecking" type="text" v-model="modifyItem" ref="cpModifyInput" @keydown="onModifyKeydown" @blur="onModifyBlur" @input="onModifyInput" :class="!!errMessage ? $style.inputError : $style.input">
                 </u-input>
             </u-validator>
@@ -17,7 +17,7 @@
             </div>
         </template>
         <!-- 添加新项的输入框和验证器 -->
-            <u-validator :rules="rules" ref="textValidator" :manual="true" @validate="catchValidation" muted="message">
+            <u-validator :rules="textRules" ref="textValidator" :manual="true" @validate="catchValidation" muted="message">
                 <u-textarea resize="none" :disabled="asyncChecking" :style="{ height: height + 'px', width: width + 'px' }" :class="[focus ? $style.textareaFocus : $style.textarea, !!errMessage && !modifying ? $style.textareaError : $style.textarea]"
                             ref="cpInput" type="text" @blur="onInputBlur" @focus="onInputFocus" @keydown="onKeydown"
                             @input="onAddInput" v-model="item">
@@ -42,7 +42,6 @@
         <!-- placeholder展示 -->
         <div v-if="!focus && !list.length && !errMessage && !asyncChecking && !item && !modifyItem" :class="$style.placeholder">{{placeholder}}</div>
         <u-validator :rules="countRules" ref="countValidator" @validate="catchValidation" muted="message" :manual="true"></u-validator>
-
     </div>
     <div v-else :class="$style.unitFieldDisabled" > </div>
 </div>

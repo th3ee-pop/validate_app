@@ -1,0 +1,45 @@
+{
+  "name": "atom-validator",
+  "description": "Atom Validator",
+  "version": "0.2.1",
+  "author": "zhangsanshi",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && mocha out/test/**/*.test.js",
+    "lint": "eslint ./src --fix",
+    "precommit": "node node_modules/vusion-hooks/precommit"
+  },
+  "main": "./out/index.js",
+  "repository": "vusion/atom-validator",
+  "bugs": {
+    "url": "http://github.com/vusion/atom-validator/issues"
+  },
+  "license": "MIT",
+  "keywords": [
+    "atom",
+    "validator"
+  ],
+  "tags": [
+    "atom",
+    "validator"
+  ],
+  "dependencies": {
+    "@types/lodash": "^4.14.136",
+    "@types/validator": "^10.11.1",
+    "lodash": "^4.17.11",
+    "validator": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^12.6.8",
+    "eslint": "^5.12.0",
+    "eslint-config-vusion": "^3.0.1",
+    "husky": "^0.14.3",
+    "mocha": "^5.2.0",
+    "ts-node": "^7.0.1",
+    "typescript": "^3.3.1",
+    "vusion-hooks": "^0.2.1"
+  },
+  "_from": "atom-validator@0.2.1",
+  "_resolved": "https://registry.npm.taobao.org/atom-validator/download/atom-validator-0.2.1.tgz"
+}

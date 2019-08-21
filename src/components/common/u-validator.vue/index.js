@@ -197,7 +197,6 @@ export const UValidator = {
             this.$nextTick(() => this.validate('blur').catch((errors) => errors));
         },
         validate(trigger = 'submit', untouched = false) {
-            console.log(trigger, this.value);
             if (this.currentTarget === 'validatorVMs') {
                 return Promise.all(this.validatorVMs.map((validatorVM) => validatorVM.validate('submit', untouched)
                     .catch((errors) => errors))).then((results) => {

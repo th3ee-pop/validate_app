@@ -28,8 +28,21 @@
                         <u-input size="huge normal" placeholder="1-65535内的整数"></u-input>
                     </u-validator>
                     <u-validator>
-                        <u-chips ref="chips" placeholder="请输入" v-model="chipList" :rules="chipRules" :list-rules="chipListRules" :allowEmpty="false" error="不能为空啊！！！">
+                        <u-chips ref="chips" placeholder="请输入" v-model="chipList" rules="integer | range(0, 100)" list-rules="maxLength(5) | noDuplicated | notEmpty" >
                         </u-chips>
+                        <!--<u-chips ref="chips" placeholder="请输入" v-model="chipList" :rules="chipRules" :list-rules="chipListRules" >
+                        </u-chips>-->
+                        <!--<u-chips ref="chips" placeholder="请输入" v-model="chipList" :rules="oldChipRules">
+                        </u-chips>-->
+                    </u-validator>
+                    <u-validator label="多选" rules="noDuplicated">
+                        <u-list-view multiple style="display: inline-block;vertical-align: middle">
+                            <u-list-view-item value="cup">水杯</u-list-view-item>
+                            <u-list-view-item value="nut">坚果</u-list-view-item>
+                            <u-list-view-item value="towel">毛巾</u-list-view-item>
+                            <u-list-view-item value="sofa">沙发</u-list-view-item>
+                            <u-list-view-item value="sofa">沙发</u-list-view-item>
+                        </u-list-view>
                     </u-validator>
                 </u-linear-layout>
             </u-validator>
@@ -67,39 +80,19 @@ export default {
                     { type: 'string', pattern: /^\d{11}$/, trigger: 'input+blur', message: '手机号码格式不正确' },
                 ],
             },
+
+
             chipRules: [
-                /*{ type: 'async', trigger: 'blur', message: '包含a', validator: (rule, value, callback) => {
-                    console.log(value);
-                   let asyncPromise = new Promise((resolve, reject) => {
-                       setTimeout(() => {
-                           if(value.indexOf('a') > -1) {
-                               reject('found!');
-                           } else {
-                               resolve('pass!');
-                           }
-                       }, 1500);
-                   });
-                    asyncPromise.then(res => callback()).catch(e => callback(new Error()))
-                } },*/
-                { type: 'string', min: 4, max: 12, trigger: 'blur', message: '请输入4~12个字符' },
+                'integer | range(0, 100)'
             ],
             chipListRules: [
-                { type: 'string', trigger: 'blur', message: '最多5个', validator: (rule, value, callback) => {
-                    if (this.chipList.length >= 5) {
-                        callback(new Error());
-                    } else {
-                        callback();
-                    }
-                }},
-                { type: 'string', trigger: 'blur', message: '重复值', validator: (rule, value, callback) => {
-                    console.log(rule,value);
-                    if (this.chipList.includes(value)) {
-                        callback(new Error());
-                    } else {
-                        callback();
-                    }
-                }},
+                'maxLength(10)',
+                'noDuplicated',
+                'notEmpty'
             ],
+            /**
+             * 原chips规则写法
+             **/
             oldChipRules: [
                 { type: 'method', trigger: 'blur',message:'最多10个', options: (value, rule, list) => {
                     return !(list.length >= 10);

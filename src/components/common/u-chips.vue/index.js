@@ -6,8 +6,8 @@ export default {
         // 异步校验
         // [{ type: 'async', trigger: 'blur', message: '', validator(rule, value, callback){}]
         // 校验通过，执行callback();校验失败，执行callback(new Error())
-        rules: Array,
-        listRules: Array,
+        rules: [Array , String],
+        listRules: [Array, String],
         noSpace: Boolean,
         disabled: Boolean,
         placement: String,
@@ -51,7 +51,7 @@ export default {
          * @param oldValue
          */
         list(value, oldValue) {
-            //this.emptyValidate();
+            this.emptyValidate();
             this.$emit('change', { value, oldValue });
         },
         /**
@@ -113,7 +113,7 @@ export default {
          */
         syncRules() {
             const rules = this.rules || [];
-            return rules.filter((r) => r.type !== 'async');
+            return (typeof this.rules === 'string') ? [] : rules.filter((r) => r.type !== 'async');
         },
         /**
          * 异步规则过滤（新版未用到）
@@ -121,7 +121,7 @@ export default {
          */
         asyncRules() {
             const rules = this.rules || [];
-            return rules.filter((r) => r.type === 'async');
+            return (typeof this.rules === 'string') ? [] : rules.filter((r) => r.type === 'async');
         },
         /**
          * 是否存在异步规则（新版未用到）
@@ -136,31 +136,34 @@ export default {
          */
         countRules() {
             let rules = [];
-            if (!this.allowEmpty) {
-                rules.push({
-                    type: 'string', trigger: 'blur', message: this.error, validator: (rule, value, callback) => {
-                        if (!this.list.length && !this.item) {
-                            callback(new Error());
-                        } else {
-                            callback();
-                        }
-                    }
-                })
+            if (!this.listRules) {
+                return [];
             }
-            rules = rules.concat(this.listRules);
+            if (!this.allowEmpty || this.listRules.indexOf('notEmpty') > -1) {
+             rules.push({required: true, trigger: 'blur', validate: (value, rule, options) => {
+                 return (!this.list.length && !this.item) ? (this.error ? this.error : '至少填入一项') : true;}
+             })
+            }
             return rules;
+        },
+        textRules() {
+            return this.formatListRules();
         },
         /**
          * textarea和input两种组件的validator的规则数组，通过formatOldRules方法来进行规则的统一（将老规则转化为新规则）
          * @returns {*}
          */
         validationMode() {
-            const oldRules = this.rules.filter(oldRule => {
-                if ((oldRule.type === 'is' || oldRule.type === 'isNot' || oldRule.type === 'method') && oldRule.options) {
-                    return oldRule;
-                }
-            });
-           return oldRules.length > 0 ? 'old': 'new';
+            if (Array.isArray(this.rules)) {
+                const oldRules = this.rules.filter(oldRule => {
+                    if ((oldRule.type === 'is' || oldRule.type === 'isNot' || oldRule.type === 'method') && oldRule.options) {
+                        return oldRule;
+                    }
+                });
+                return oldRules.length > 0 ? 'old': 'new';
+            } else if (typeof this.rules === 'string') {
+                return 'new';
+            }
         }
     },
     created() {
@@ -176,9 +179,6 @@ export default {
         }
         this.$emit('validMethod', this.submitValidate);
     },
-    mounted() {
-        console.log(this.validationMode);
-    },
     destroyed() {
         window.removeEventListener('keydown', this.onDocKeydown, false);
         if (this.type === 'searchInput')
@@ -186,49 +186,49 @@ export default {
     },
     methods: {
         /**
-         * 用于将原u-chips的验证方法转化为validator可识别的rule，需要对is，isNOT，method以及async四种类型分别处理
+         * 根据list-rules定制验证chips数量相关和重复值的检验规则。
+         * @returns {Array}
          */
-        formatOldRules() {
-            return this.rules.map(oldRule => {
-                if ((oldRule.type === 'is' || oldRule.type === 'isNot' || oldRule.type === 'method') && oldRule.options) {
-                    /**
-                     * method类型，主要目标是将原u-chips的验证回调函数的逻辑转化为validator的验证逻辑。
-                     */
-                    if (oldRule.type === 'method') {
-                        return {type: 'string', trigger: 'blur', message: oldRule.message, validator: (rule, value, callback)=> {
-                            rule.message = oldRule.message;
-                            if (!oldRule.options(value, oldRule, this.list)) {
-                                callback(new Error())
-                            } else {
-                                callback();
+        formatListRules() {
+            let rules = [];
+            if (typeof this.listRules === 'string') {
+                rules = this.listRules.split('|') || [];
+            } else {
+                rules = this.listRules || [];
+            }
+            let newRules = rules.map(rule => {
+                    if (rule.indexOf('noDuplicated') > -1) {
+                        return {
+                            trigger: 'blur', validate: (value, rule, options) => {
+                                if (this.list.indexOf(value) > -1) {
+                                    return rule.message ? rule.message : '该输入项已经存在';
+                                }
                             }
-                        }}
-                    } else if (oldRule.type === 'is') {
-                        return {type: 'string', trigger: 'blur', message: oldRule.message, pattern: oldRule.options}
-                    } else if (oldRule.type === 'isNot') {
-                        return {type: 'string', trigger: 'blur', message: oldRule.message, validator: (rule, value, callback)=> {
-                            rule.message = oldRule.message;
-                            if (oldRule.options.test(value)) {
-                                callback(new Error())
-                            } else {
-                                callback();
-                            }
-                        }}
+                        }
                     }
-
-                } else if (oldRule.type === 'async' && oldRule.validator) {
-                    return {  type: 'string',  trigger: oldRule.trigger, message: oldRule.message, validator: (rule, value, callback) => {
-                        this.asyncChecking = true;
-                        oldRule.validator(oldRule, value, res => {
-                            this.asyncChecking = false;
-                            console.log(res);
-                            rule.message = oldRule.message;
-                            res instanceof Error ? callback(new Error()) : callback();
-                        })
-                    } }
-                }
-                return oldRule;
-            });
+                    if (rule.indexOf('maxLength') > -1) {
+                         let length = 999;
+                         rule.replace(/\d+/g, ($1) => {
+                            length = parseInt($1);
+                        });
+                        return {
+                            trigger: 'blur', validate: (value, rule, options) => {
+                                if (this.list.length === length && value) {
+                                    return rule.message ? rule.message : `已经达到输入上限${length}`;
+                                }
+                            }
+                        }
+                    }
+                    if (rule.indexOf('notEmpty') > -1) {
+                        return false;
+                    }
+                });
+            newRules = newRules.filter(rule => rule);
+            if (typeof this.rules === 'string') {
+                return [this.rules, ...newRules];
+            } else if (Array.isArray(this.rules)) {
+                return this.rules.concat(newRules);
+            }
         },
         /**
          * new捕获所有得到的验证信息
@@ -404,8 +404,8 @@ export default {
          * 手动触发input类型的检验事件
          */
         onModifyInput() {
+            console.log('modify inputing');
             if (this.modifyItem.endsWith(' ') || !this.modifyItem.includes(' ')) {
-                console.log(this.$refs.modifyValidator);
                 this.$refs.modifyValidator[0].value = this.modifyItem;
                 this.$refs.modifyValidator[0].validate('input');
             }
@@ -492,7 +492,6 @@ export default {
          * @param {object} event - 包装的event对象
          */
         onDBLClick(index, event) {
-            console.log(this.errMessage);
             if (this.asyncChecking || this.errMessage)
                 return;
             if (index === this.list.length - 1) {
@@ -580,7 +579,6 @@ export default {
                     this.validate(itm, 'input+blur');
                     if (this.errMessage)
                     {
-                        console.log(this.errMessage)
                         return false;
                     }
                     else {
@@ -616,8 +614,8 @@ export default {
                 try {
                     targetValidator.value = itemArr[i];
                     let valueValidation = targetValidator.validate('blur');
-                    let countValidation = this.$refs.countValidator.validate('blur');
-                    await Promise.all([valueValidation, countValidation]).then(res => {
+                    //let countValidation = this.$refs.countValidator.validate('blur');
+                    await Promise.all([valueValidation]).then(res => {
                         isModify ? this.list.splice(this.current, 0 ,itemArr[i]) : this.list.push(itemArr[i]);
                         this.$emit('input', this.list);
                     })
@@ -730,7 +728,6 @@ export default {
          * @param {number} index - 某项的索引
          */
         deleteItem(index) {
-            console.log('deleting');
             if (this.asyncChecking)
                 return;
             this.list.splice(index, 1);
@@ -774,8 +771,8 @@ export default {
          */
         emptyValidate(value = '') {
             if (this.validationMode === 'new') {
-                this.$refs.countValidator.validate('blur').catch(e => {
-                    console.log(e);
+                this.$refs.countValidator.validate('blur').then(res => {
+                }).catch(e => {
                 });
             } else {
                 if (!this.allowEmpty && !this.list.length) {
